@@ -43,6 +43,7 @@ def _maybe_sm90_op():
 
     return FusedLinearLogpSM90Op()
 
+
 # (num_tokens, hidden_dim, vocab)
 DEFAULT_CONFIGS = [
     (4096, 2048, 32768),

@@ -55,6 +55,7 @@ def _sm90_inputs(seed, *, bias=True, dtype=torch.bfloat16, lead=None):
     target = torch.randint(0, _SM90_V, lead, generator=gen, device="cuda")
     return hidden, weight, target, bias_t
 
+
 # Deliberately non-multiples of the kernel block sizes (32 / 64 / 64).
 _N = 40
 _D = 80
