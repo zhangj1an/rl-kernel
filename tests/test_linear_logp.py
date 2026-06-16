@@ -284,6 +284,22 @@ def test_sm90_falls_back_for_unsupported_inputs():
     assert torch.allclose(out, ref, atol=2e-2)
 
 
+@requires_sm90
+def test_sm90_rejects_bad_target_and_bias():
+    # Shape/device mismatches must be a clean error, not a CUDA illegal access.
+    from rl_engine.kernels.ops.cuda.loss.linear_logp import FusedLinearLogpSM90Op
+
+    sm90 = FusedLinearLogpSM90Op()
+    hidden, weight, target, bias = _sm90_inputs(17)
+
+    with pytest.raises((ValueError, RuntimeError)):  # wrong target length
+        sm90(hidden, weight, target[:-1], bias)
+    with pytest.raises((ValueError, RuntimeError)):  # wrong bias length
+        sm90(hidden, weight, target, bias[:-1])
+    with pytest.raises((ValueError, RuntimeError)):  # bias on the wrong device
+        sm90(hidden, weight, target, bias.cpu())
+
+
 def test_registry_dispatch_matches_native():
     from rl_engine.kernels.registry import kernel_registry
     from rl_engine.platforms.device import device_ctx

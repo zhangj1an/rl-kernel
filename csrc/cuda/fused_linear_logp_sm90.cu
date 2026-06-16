@@ -310,6 +310,13 @@ std::vector<torch::Tensor> fused_linear_logp_sm90_forward(torch::Tensor hidden,
     const int V = weight.size(0);
     TORCH_CHECK(weight.size(1) == D, "hidden/weight hidden-dim mismatch");
     TORCH_CHECK(D % BK == 0, "D must be a multiple of ", BK, " for the SM90 kernel");
+    TORCH_CHECK(target.numel() == N, "target must have one id per token: expected ", N,
+                " (hidden rows), got ", target.numel());
+    if (bias.has_value()) {
+        TORCH_CHECK(bias->device() == hidden.device(),
+                    "bias must be on the same device as hidden");
+        TORCH_CHECK(bias->numel() == V, "bias must have V=", V, " elements, got ", bias->numel());
+    }
 
     auto opts_f = hidden.options().dtype(torch::kFloat);
     auto logp = torch::empty({N}, opts_f);

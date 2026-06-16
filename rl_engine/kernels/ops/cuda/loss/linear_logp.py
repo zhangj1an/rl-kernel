@@ -140,9 +140,21 @@ class FusedLinearLogpSM90Op:
                 f"hidden dim {hidden.size(-1)} must match lm_head_weight dim "
                 f"{lm_head_weight.size(-1)}"
             )
-        # The compiled forward is bf16-only and needs D % BK == 0. For anything
-        # else (fp32/fp16 references, awkward hidden dims, CPU tensors) fall back
-        # to a portable backend so the op stays a drop-in for any input.
+        n_tokens = hidden.numel() // hidden.size(-1)
+        if target_ids.numel() != n_tokens:
+            raise ValueError(
+                f"target_ids must have one id per token: expected {n_tokens}, "
+                f"got {target_ids.numel()}"
+            )
+        if bias is not None:
+            if bias.numel() != lm_head_weight.size(0):
+                raise ValueError(
+                    f"bias must have V={lm_head_weight.size(0)} elements, got {bias.numel()}"
+                )
+            if bias.device != hidden.device:
+                raise ValueError(
+                    f"bias device {bias.device} must match hidden device {hidden.device}"
+                )
         if not _sm90_supported(hidden, lm_head_weight):
             return _fallback_op()(hidden, lm_head_weight, target_ids, bias)
         return _FusedLinearLogpSM90Function.apply(hidden, lm_head_weight, bias, target_ids)
