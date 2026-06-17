@@ -140,6 +140,11 @@ class FusedLinearLogpSM90Op:
                 f"hidden dim {hidden.size(-1)} must match lm_head_weight dim "
                 f"{lm_head_weight.size(-1)}"
             )
+        if lm_head_weight.device != hidden.device:
+            raise ValueError(
+                f"lm_head_weight device {lm_head_weight.device} must match hidden "
+                f"device {hidden.device}"
+            )
         n_tokens = hidden.numel() // hidden.size(-1)
         if target_ids.numel() != n_tokens:
             raise ValueError(

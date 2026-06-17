@@ -292,6 +292,8 @@ def test_sm90_rejects_bad_target_and_bias():
     sm90 = FusedLinearLogpSM90Op()
     hidden, weight, target, bias = _sm90_inputs(17)
 
+    with pytest.raises((ValueError, RuntimeError)):  # weight on the wrong device
+        sm90(hidden, weight.cpu(), target, bias)
     with pytest.raises((ValueError, RuntimeError)):  # wrong target length
         sm90(hidden, weight, target[:-1], bias)
     with pytest.raises((ValueError, RuntimeError)):  # wrong bias length

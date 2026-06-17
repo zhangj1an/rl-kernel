@@ -302,6 +302,9 @@ std::vector<torch::Tensor> fused_linear_logp_sm90_forward(torch::Tensor hidden,
                                                           torch::Tensor weight,
                                                           torch::Tensor target,
                                                           torch::optional<torch::Tensor> bias) {
+    TORCH_CHECK(hidden.is_cuda() && weight.is_cuda(), "hidden and weight must be CUDA tensors");
+    TORCH_CHECK(weight.device() == hidden.device(),
+                "lm_head_weight must be on the same device as hidden");
     TORCH_CHECK(hidden.scalar_type() == at::kBFloat16, "hidden must be bfloat16");
     TORCH_CHECK(weight.scalar_type() == at::kBFloat16, "weight must be bfloat16");
     TORCH_CHECK(hidden.is_contiguous() && weight.is_contiguous(), "inputs must be contiguous");
