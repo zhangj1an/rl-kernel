@@ -2,25 +2,20 @@
 # Copyright (c) 2026 RL-Kernel Contributors
 
 """
-Prefill / decode KV-cache path-consistency tests (WS1, issue #152).
+Prefill / decode KV-cache path-consistency tests.
 
-One representative test per claim across the five planned PRs:
-
-  1. Full-prefill == chunked-prefill, and naive batched SDPA is NOT bitwise.
-  2. Decode (one query vs N cached KV) == prefill (incl. padding, GQA).
-  3. Stored-KV: matched dtype is bitwise; low precision stays bounded.
-  4. "Generate then re-score" equivalence.
-  5. CI smoke across short / long / varlen / padded.
-
-Contract: prefill and decode share one fixed reduction order, so matched dtype
-is bitwise-equal. CPU/fp32 -- no GPU/kernel build required.
+Prefill (whole-sequence re-scoring) and decode (one query against the cached KV
+of preceding tokens) share a single fixed reduction order, so for matched dtype
+they produce bitwise-identical logits and logprobs. These tests assert that
+equivalence across chunked prefill, padded and variable-length sequences, stored
+KV dtypes, and an end-to-end generate-then-rescore round trip. They run on CPU in
+fp32 and require no GPU or compiled kernels.
 """
 
 from __future__ import annotations
 
 import pytest
 import torch
-
 import torch.nn.functional as F
 
 from rl_engine.testing.kv_consistency import (
@@ -52,7 +47,7 @@ def _make_qkv(batch, seqlen, spec, *, seed=0):
 
 
 # --------------------------------------------------------------------------- #
-# PR1 -- Full-prefill vs chunked-prefill consistency.
+# Prefill reduction order
 # --------------------------------------------------------------------------- #
 
 
@@ -81,17 +76,21 @@ def _naive_batched_sdpa(q, k, v, spec):
     return out.transpose(1, 2)
 
 
-def test_naive_sdpa_only_matches_within_tolerance():
-    """The naive batched path drifts from the contract -- the bug #152 targets."""
+def test_naive_sdpa_diverges_from_fixed_order():
+    """A whole-sequence SDPA reduces in a different order and is not bitwise-equal.
+
+    This guards the contract: it confirms the bitwise guarantee is meaningful
+    rather than vacuously true, while staying within close numerical tolerance.
+    """
     q, k, v = _make_qkv(2, 48, SPEC)
     contract = fixed_order_attention(q, k, v, spec=SPEC)
     report = parity_report(_naive_batched_sdpa(q, k, v, SPEC), contract)
-    assert not report.bitwise  # close, but NOT bitwise: reduction-order drift
+    assert not report.bitwise
     assert report.max_abs_error < 1e-4
 
 
 # --------------------------------------------------------------------------- #
-# PR2 -- Decode (one query vs N cached KV) vs prefill.
+# Decode vs prefill parity
 # --------------------------------------------------------------------------- #
 
 
@@ -119,7 +118,7 @@ def test_decode_matches_prefill_with_padding(pad_side):
 
 
 # --------------------------------------------------------------------------- #
-# PR3 -- Stored-KV layout/dtype: no writer-vs-reader precision drift.
+# Stored-KV dtype
 # --------------------------------------------------------------------------- #
 
 
@@ -140,7 +139,7 @@ def test_stored_kv_low_precision_within_tolerance():
 
 
 # --------------------------------------------------------------------------- #
-# PR4 -- "Generate then re-score" equivalence (full forward chain).
+# Generate then re-score
 # --------------------------------------------------------------------------- #
 
 
@@ -158,7 +157,7 @@ def test_generate_then_rescore_equivalence():
 
 
 # --------------------------------------------------------------------------- #
-# PR5 -- CI smoke test (short / long / varlen / padded).
+# Decode smoke coverage
 # --------------------------------------------------------------------------- #
 
 

@@ -2,7 +2,7 @@
 # Copyright (c) 2026 RL-Kernel Contributors
 
 """
-Prefill / decode KV-cache path-consistency harness (WS1, issue #152).
+Prefill / decode KV-cache path-consistency harness.
 
 Rollout generates token-by-token through a *decode* path (one query against the
 cached KV of the preceding tokens). Training re-scores the same sequence through
@@ -198,8 +198,8 @@ def replay_decode(
 
     With ``kv_dtype`` equal to ``q.dtype`` (default) the stored context is a
     bitwise copy of the prefill keys, so the output equals
-    :func:`fixed_order_attention` bitwise. ``kv_dtype`` lets PR3 exercise
-    lower-precision stored KV (writer-vs-reader drift).
+    :func:`fixed_order_attention` bitwise. A lower-precision ``kv_dtype``
+    exercises writer-vs-reader drift introduced solely by the stored KV.
     """
 
     _check_qkv(q, k, v, spec)
@@ -221,7 +221,7 @@ def replay_decode(
 
 
 # --------------------------------------------------------------------------- #
-# Parity assertion helper (aligns with the #108 tolerance conventions).
+# Parity assertion helper (bitwise where required, else within tolerance).
 # --------------------------------------------------------------------------- #
 
 
