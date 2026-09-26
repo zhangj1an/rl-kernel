@@ -116,6 +116,48 @@ Raising `trajectory_precision` changes both storage and subsequent model inputs.
 
 A first memory smoke test may replay one selected SDE step, explicitly labeled as partial coverage. It cannot establish coverage of all `[0,3,6]` steps. Preserve the recipe's topology, valid geometry, and batch-1 requirements; actual H100 memory requirements remain to be verified.
 
+### 6.1. Staged experiment plan and rollout budget
+
+Start with fixed weights. A rollout/training round is not a diffusion denoising step: one round can contain multiple samples and multiple scored SDE transitions. Report rounds, samples, and scored transitions separately.
+
+| Phase | Proposed scope | Purpose and progression gate |
+| --- | --- | --- |
+| A: Capture and alignment smoke test | One rollout batch, followed by pre-update replay of exactly the same trajectories | Verify immutable original logp, trajectory identity, weight identity, masks, and all comparability gates. Report differences only for comparable pairs. |
+| B: Fixed-weight coverage | Initially 3–8 rollout batches with recorded prompts and seeds; repeat replay on the same stored trajectories | Measure repeatability and variation across samples and selected SDE steps. Keep weights and execution configuration fixed; record input/seed variations explicitly. Expand coverage if results vary or required cases are missing. |
+| C: Training-time tracking | Consider 60 rounds first, extending to 200 if needed for the stated question | Observe differences as training changes the model. Requires an update-enabled integration and validated pre-update pairing; this is a separate experiment, not a prerequisite for detecting an initial mismatch. |
+
+These counts are proposed experiment budgets, not statistical sufficiency thresholds. One reproducible mismatch on a valid, same-weight pair is enough to demonstrate inconsistency for that case. Zero observed mismatches in one batch, 60 rounds, or 200 rounds does not prove consistency outside the measured coverage.
+
+For Phase A:
+
+- [ ] Use the capture-only recipe with optimizer, scheduler, and EMA updates disabled.
+- [ ] Preserve rollout logp before the replay anchor can replace it.
+- [ ] Replay the identical trajectory, including conditioning, timesteps, latents, and scored destinations; do not generate a second trajectory for the comparison.
+- [ ] Check video and audio evidence and coverage of selected SDE indices `[0,3,6]`. Label a single-step memory smoke test as partial coverage.
+- [ ] Repeat replay without changing weights and report both rollout-versus-replay differences and replay-versus-replay differences.
+- [ ] Stop numerical interpretation if any comparability gate fails. Repair missing evidence or alignment before increasing the rollout budget.
+
+For Phase B, retain per-sample/per-transition metrics as well as aggregates. Report absolute logp differences, ratio deviations, exact mismatch counts, and the declared numerical tolerances. Do not average away isolated large differences. A repeatable difference should trigger the single-factor diagnosis above; collecting more rounds alone does not explain its cause.
+
+For Phase C, compare each rollout against replay **before the first update that changes its generating weights**, with explicit weight/version identifiers and phase tags. Later replay under updated weights must be recorded separately: that difference includes policy learning and is not a same-weight train/infer consistency measurement. Preserve immutable raw rollout logp in every round.
+
+The current capture-only recipe is designed to suppress training updates. Running it 200 times would be a fixed-weight coverage experiment, not the equivalent of 200 VIME training rounds. Long-run tracking needs separate implementation/validation of update-enabled capture. This plan does not authorize launching that run.
+
+### 6.2. Prior VIME evidence and what it establishes
+
+The inspected local VIME artifacts used several budgets for different purposes:
+
+| Evidence | Observed budget | Interpretation |
+| --- | --- | --- |
+| `vime_qwen3_8b_tp2_cp2_200_experiment/results/current/summary.json` | One round per smoke run | The parent directory's `200` suffix does not mean these smoke runs lasted 200 rounds. |
+| `vime_qwen3_8b_tp4_cp2_200_experiment/results/pr424-eval-3r/REPORT.md` | Three rollout/training rounds | Short P/P and R/R validation; logp differences were measurable without waiting for 200 rounds. |
+| `vime_module_ablation_20260911/cuda-final/cuda-module-matrix-d78ef96-eb1f5a0.json` | Eight rounds per matrix case | Module-ablation comparison budget, not a universal minimum. |
+| `vime_qwen3_8b_tp4_cp2_200_experiment/runs/convergence/g10-convergence-s1234-tp4-20260901j/` | 200 rounds, IDs 0–199 | Completed long-run convergence experiment. |
+
+All paths in this table are relative to `/data/ellm/`. The three-round report records 73,405 mismatched elements out of 123,083 for P/P, with maximum absolute logp difference 0.491172791; R/R records zero mismatches out of 124,226. These are distinct generated workloads, not a shared-trajectory comparison between P/P and R/R.
+
+Evidence provenance matters: the eight-round matrix uses mismatch-sidecar artifacts for its train/rollout comparison, while the long run reports runtime mismatch/max metrics; neither should be described as a complete offline comparison of ordinary dumps containing both logp tensors. MiniMax-H3 uses diffusion transition logp rather than Qwen token logp, so the VIME numbers are protocol references, not numerical acceptance thresholds for MiniMax-H3. The inspected evidence does not establish 60 rounds as a standard or sufficient budget.
+
 ## 7. Required artifacts
 
 The proposed layout below is a diagnostic convention, not an implemented RL-Kernel sealed-attempt schema:
