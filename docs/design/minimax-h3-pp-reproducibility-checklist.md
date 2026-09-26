@@ -1,6 +1,6 @@
 # MiniMax-H3 P/P reproducibility checklist
 
-Status: experiment protocol, not an executed validation. Instrumentation and runtime setup are still pending. Unchecked items require evidence from the actual run.
+Status: experiment protocol. The initial two-round, one-update diagnostic completed on 2026-09-26; see the [backward and update results](minimax-h3-pp-backward-update-results.md). That report records the executed configuration, evidence, and remaining limitations; it does not mark every protocol item complete.
 
 ## Scope
 
